@@ -254,7 +254,7 @@ def extract_response(page):
                 text = body
         
         if text:
-            text = re.sub(r'^Thought for \d+s\s*', '', text)
+            text = re.sub(r'^(Thought|Worked) for \d+s\s*', '', text)
             text = re.sub(
                 r'\n+(Fast|Auto|Expert|Heavy|Ask Grok anything|'
                 r'What do you want to know\?|Search|New Chat|Imagine).*$',
@@ -341,35 +341,21 @@ def send_prompt(page, prompt, model=MODEL_FAST):
     deadline = time.time() + 120
     started = time.time()
     
+    # The user's own bubble also has a Copy button, so the Stop/Copy check fired before the
+    # answer existed and returned status text ("Ran 2 searches Thinking..."). Instead, wait
+    # until the reply text is more than a status line and has not changed for 3 seconds.
+    status_only = re.compile(r'^(Ran \d+ searche?s?|Thinking|Working for \d+s|Searching|\s)*$')
+    last, same = "", 0
     while time.time() < deadline:
-        stop_btns = page.locator('button:has-text("Stop"), button[aria-label="Stop"]')
-        copy_btns = page.locator('button:has-text("Copy"), button[aria-label="Copy"]')
-        
-        stop_visible = copy_visible = False
-        try:
-            if stop_btns.count() > 0:
-                stop_visible = stop_btns.first.is_visible()
-        except Exception:
-            pass
-        try:
-            if copy_btns.count() > 0:
-                copy_visible = copy_btns.first.is_visible()
-        except Exception:
-            pass
-        
-        if not stop_visible and copy_visible:
-            time.sleep(2)
-            break
-        
-        if not stop_visible and time.time() - started > 10:
-            time.sleep(2)
-            try:
-                if stop_btns.count() == 0 or not stop_btns.first.is_visible():
-                    break
-            except Exception:
+        time.sleep(1)
+        text = extract_response(page)
+        if text and text == last and not status_only.match(text) and text != prompt:
+            same += 1
+            if same >= 3:
                 break
-        
-        time.sleep(2)
+        else:
+            same = 0
+        last = text
     else:
         log("Timeout — extracting partial response...")
     
@@ -404,9 +390,9 @@ def run_browser_login():
         log("Waiting for login... (timeout: 10 minutes)")
         
         for _ in range(600):
-            signin = page.locator('button:has-text("Sign in")').count()
-            if signin == 0:
-                cookies = context.cookies()
+            # "No Sign in button" is also true before the page loads; wait for the sso cookie instead.
+            cookies = context.cookies()
+            if any(c['name'] == 'sso' and 'grok.com' in c.get('domain', '') for c in cookies):
                 auth = {"cookies": {}}
                 for c in cookies:
                     if 'grok.com' in c.get('domain', ''):

@@ -29,7 +29,7 @@ grok.py                   # Single-file CLI (~570 lines)
 - **Firefox over Chrome**: Chrome encrypts cookies with DPAPI (Windows) / Keychain (macOS). Firefox SQLite is readable cross-platform.
 - **message-bubble selector**: Grok renders chat messages as `<div class="message-bubble">`. The last one is always the assistant response.
 - **TipTap editor**: Grok uses a contenteditable `div.tiptap.ProseMirror` for input, not a standard `<textarea>`. Uses `page.keyboard.type()`.
-- **Stop/Copy button detection**: Response completion is detected by "Stop" button disappearing and "Copy" button appearing.
+- **Stable-text detection**: Response completion is detected when the last bubble's text is more than a status line ("Ran N searches", "Thinking", "Working for Xs") and has not changed for 3 seconds. The Stop/Copy button check was dropped: the user's own bubble also has a Copy button, so it fired before the answer existed.
 
 ## Response Extraction
 
@@ -37,7 +37,7 @@ The extraction targets `[class*="message-bubble"]` elements:
 - User message = first bubble
 - Assistant response = last bubble
 
-"Thought for Xs" prefix is stripped — Grok shows a brief thinking indicator even on the Fast model.
+"Thought for Xs" / "Worked for Xs" prefix is stripped — Grok shows a brief thinking indicator even on the Fast model.
 
 ## Multi-Turn Conversations
 
